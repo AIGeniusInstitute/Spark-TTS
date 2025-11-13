@@ -14,13 +14,14 @@
 # limitations under the License.
 
 import re
-import torch
-from typing import Tuple
 from pathlib import Path
+from typing import Tuple
+
+import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-from sparktts.utils.file import load_config
 from sparktts.models.audio_tokenizer import BiCodecTokenizer
+from sparktts.utils.file import load_config
 from sparktts.utils.token_parser import LEVELS_MAP, GENDER_MAP, TASK_TOKEN_MAP
 
 
@@ -51,10 +52,10 @@ class SparkTTS:
         self.model.to(self.device)
 
     def process_prompt(
-        self,
-        text: str,
-        prompt_speech_path: Path,
-        prompt_text: str = None,
+            self,
+            text: str,
+            prompt_speech_path: Path,
+            prompt_text: str = None,
     ) -> Tuple[str, torch.Tensor]:
         """
         Process input for voice cloning.
@@ -108,11 +109,11 @@ class SparkTTS:
         return inputs, global_token_ids
 
     def process_prompt_control(
-        self,
-        gender: str,
-        pitch: str,
-        speed: str,
-        text: str,
+            self,
+            gender: str,
+            pitch: str,
+            speed: str,
+            text: str,
     ):
         """
         Process input for voice creation.
@@ -156,16 +157,16 @@ class SparkTTS:
 
     @torch.no_grad()
     def inference(
-        self,
-        text: str,
-        prompt_speech_path: Path = None,
-        prompt_text: str = None,
-        gender: str = None,
-        pitch: str = None,
-        speed: str = None,
-        temperature: float = 0.8,
-        top_k: float = 50,
-        top_p: float = 0.95,
+            self,
+            text: str,
+            prompt_speech_path: Path = None,
+            prompt_text: str = None,
+            gender: str = None,
+            pitch: str = None,
+            speed: str = None,
+            temperature: float = 0.8,
+            top_k: float = 50,
+            top_p: float = 0.95,
     ) -> torch.Tensor:
         """
         Performs inference to generate speech from text, incorporating prompt audio and/or text.
@@ -193,10 +194,14 @@ class SparkTTS:
             )
         model_inputs = self.tokenizer([prompt], return_tensors="pt").to(self.device)
 
+        # max_new_tokens=3000的估算：
+        # 理论上，3000个token大约可以表示150-300个汉字的内容
+        # 考虑到模型会生成一些额外的控制token和上下文信息，实际能处理的汉字数量可能在100-250字之间
+
         # Generate speech using the model
         generated_ids = self.model.generate(
             **model_inputs,
-            max_new_tokens=3000,
+            max_new_tokens=10000,
             do_sample=True,
             top_k=top_k,
             top_p=top_p,
@@ -205,7 +210,7 @@ class SparkTTS:
 
         # Trim the output tokens to remove the input tokens
         generated_ids = [
-            output_ids[len(input_ids) :]
+            output_ids[len(input_ids):]
             for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
         ]
 
