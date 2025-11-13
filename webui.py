@@ -13,15 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import torch
-import soundfile as sf
-import logging
 import argparse
-import gradio as gr
+import logging
+import os
 import platform
-
+import shutil
 from datetime import datetime
+
+import gradio as gr
+import soundfile as sf
+import torch
+from fastapi import FastAPI, File, UploadFile, Form
+from fastapi.responses import FileResponse
+
 from cli.SparkTTS import SparkTTS
 from sparktts.utils.token_parser import LEVELS_MAP_UI
 
@@ -49,14 +53,14 @@ def initialize_model(model_dir="pretrained_models/Spark-TTS-0.5B", device=0):
 
 
 def run_tts(
-    text,
-    model,
-    prompt_text=None,
-    prompt_speech=None,
-    gender=None,
-    pitch=None,
-    speed=None,
-    save_dir="example/results",
+        text,
+        model,
+        prompt_text=None,
+        prompt_speech=None,
+        gender=None,
+        pitch=None,
+        speed=None,
+        save_dir="example/results",
 ):
     """Perform TTS inference and save the generated audio."""
     logging.info(f"Saving audio to: {save_dir}")
@@ -91,11 +95,7 @@ def run_tts(
     return save_path
 
 
-def build_ui(model_dir, device=0):
-
-    # Initialize model
-    model = initialize_model(model_dir, device=device)
-
+def build_ui(model):
     # Define callback function for voice cloning
     def voice_clone(text, prompt_text, prompt_wav_upload, prompt_wav_record):
         """
@@ -252,19 +252,57 @@ def parse_arguments():
     )
     return parser.parse_args()
 
+
 if __name__ == "__main__":
     # Parse command-line arguments
     args = parse_arguments()
 
-    # Build the Gradio demo by specifying the model directory and GPU device
-    demo = build_ui(
+    # Initialize model
+    model = initialize_model(
         model_dir=args.model_dir,
         device=args.device
     )
 
-    # Launch Gradio with the specified server name and port
-    demo.launch(
-        server_name=args.server_name,
-        server_port=args.server_port,
-        share=True
+    # Build the Gradio demo
+    demo = build_ui(model)
+
+    # Create FastAPI app
+    app = FastAPI()
+
+
+    @app.post("/api/tts/voice_clone")
+    async def tts_voice_clone(
+            text: str = Form(...),
+            prompt_text: str = Form(None),
+            prompt_speech: UploadFile = File(...)
+    ):
+        # Save the uploaded file temporarily
+        temp_prompt_path = f"temp_{prompt_speech.filename}"
+        with open(temp_prompt_path, "wb") as buffer:
+            shutil.copyfileobj(prompt_speech.file, buffer)
+
+        # Run TTS
+        output_path = run_tts(
+            text=text,
+            model=model,
+            prompt_text=prompt_text,
+            prompt_speech=temp_prompt_path,
+        )
+
+        # Clean up temporary file
+        os.remove(temp_prompt_path)
+
+        return FileResponse(output_path, media_type="audio/wav")
+
+
+    # Mount Gradio app
+    app = gr.mount_gradio_app(app, demo, path="/")
+
+    # Launch FastAPI app with uvicorn
+    import uvicorn
+
+    uvicorn.run(
+        app,
+        host=args.server_name,
+        port=args.server_port
     )

@@ -11,3 +11,7 @@ torchaudio==2.8.0
 tqdm==4.66.5
 transformers==4.53.0
 gradio==5.31.0
+python-multipart
+fastapi
+uvicorn
+pydub
