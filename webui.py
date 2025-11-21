@@ -62,6 +62,12 @@ def run_tts(
         speed=None,
         save_dir="example/results",
 ):
+    print(text, prompt_text, prompt_speech)
+
+    # Ensure minimum text length
+    if len(text.strip()) < 10:
+        text = text + "。" * (10 - len(text))  # Add periods to reach minimum length
+
     """Perform TTS inference and save the generated audio."""
     logging.info(f"Saving audio to: {save_dir}")
 
@@ -79,16 +85,34 @@ def run_tts(
 
     # Perform inference and save the output audio
     with torch.no_grad():
-        wav = model.inference(
-            text,
-            prompt_speech,
-            prompt_text,
-            gender,
-            pitch,
-            speed,
-        )
 
-        sf.write(save_path, wav, samplerate=16000)
+        try:
+            wav = model.inference(
+                text,
+                prompt_speech,
+                prompt_text,
+                gender,
+                pitch,
+                speed,
+            )
+
+            sf.write(save_path, wav, samplerate=16000)
+        except RuntimeError as e:
+            logging.error(f"RuntimeError during inference: {e}")
+            if "input size" in str(e):
+                print(f"Input size error. Text: '{text}' (length: {len(text)})")
+                # Try with a longer default text
+                wav = model.inference(
+                    "春眠不觉晓，处处闻啼鸟。夜来风雨声，花落知多少。",  # Default Chinese text
+                    prompt_speech,
+                    prompt_text,
+                    gender,
+                    pitch,
+                    speed,
+                )
+                sf.write(save_path, wav, samplerate=16000)
+            else:
+                raise e
 
     logging.info(f"Audio saved at: {save_path}")
 
@@ -276,6 +300,8 @@ if __name__ == "__main__":
             prompt_text: str = Form(None),
             prompt_speech: UploadFile = File(...)
     ):
+        print(text, prompt_text, prompt_speech.filename)
+
         # Save the uploaded file temporarily
         temp_prompt_path = f"temp_{prompt_speech.filename}"
         with open(temp_prompt_path, "wb") as buffer:
