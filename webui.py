@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import traceback
 import argparse
 import logging
 import os
@@ -62,11 +63,13 @@ def run_tts(
         speed=None,
         save_dir="example/results",
 ):
-    print(text, prompt_text, prompt_speech)
+    print(f"run_tts: \ntext={text}, \nprompt_text={prompt_text}, \nprompt_speech={prompt_speech}")
+
 
     # Ensure minimum text length
-    if len(text.strip()) < 10:
-        text = text + "。" * (10 - len(text))  # Add periods to reach minimum length
+    minimum_text_length = 40
+    if len(text.strip()) < minimum_text_length:
+        text = text + "。" * (minimum_text_length - len(text))  # Add periods to reach minimum length
 
     """Perform TTS inference and save the generated audio."""
     logging.info(f"Saving audio to: {save_dir}")
@@ -97,8 +100,12 @@ def run_tts(
             )
 
             sf.write(save_path, wav, samplerate=16000)
+
         except RuntimeError as e:
             logging.error(f"RuntimeError during inference: {e}")
+            # 打印完整堆栈
+            traceback.print_exc()
+
             if "input size" in str(e):
                 print(f"Input size error. Text: '{text}' (length: {len(text)})")
                 # Try with a longer default text
@@ -300,7 +307,7 @@ if __name__ == "__main__":
             prompt_text: str = Form(None),
             prompt_speech: UploadFile = File(...)
     ):
-        print(text, prompt_text, prompt_speech.filename)
+        print(f"/api/tts/voice_clone: \ntext={text}, \nprompt_text={prompt_text}, \nprompt_speech={prompt_speech.filename}")
 
         # Save the uploaded file temporarily
         temp_prompt_path = f"temp_{prompt_speech.filename}"
