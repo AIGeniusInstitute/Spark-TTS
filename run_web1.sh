@@ -1,0 +1,1 @@
+python webui.py --device 0 --server_port 7860

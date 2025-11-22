@@ -323,7 +323,7 @@ if __name__ == "__main__":
         )
 
         # Clean up temporary file
-        os.remove(temp_prompt_path)
+        # os.remove(temp_prompt_path)
 
         return FileResponse(output_path, media_type="audio/wav")
 
